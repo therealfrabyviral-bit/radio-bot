@@ -12,9 +12,29 @@ def home():
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = "-1004486063729"
-PINNED_MESSAGE_ID = None  
 ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/subscribe/a1usb5hslvgvv"
 SITE_URL = "https://radioverbania.surge.sh"
+
+PIN_FILE = "pinned.json"
+
+def load_pinned_id():
+    if os.path.exists(PIN_FILE):
+        try:
+            with open(PIN_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("message_id")
+        except Exception:
+            pass
+    return None
+
+def save_pinned_id(message_id):
+    try:
+        with open(PIN_FILE, "w") as f:
+            json.dump({"message_id": message_id}, f)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] Errore salvataggio pin file: {e}", flush=True)
+
+PINNED_MESSAGE_ID = load_pinned_id()
 
 def get_current_song():
     response = None
@@ -23,7 +43,7 @@ def get_current_song():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Accept': 'text/event-stream'
         }
-        response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=5)
+        response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=(5, 15))
 
         if response.status_code == 200:
             for line in response.iter_lines():
@@ -41,7 +61,7 @@ def get_current_song():
                         except json.JSONDecodeError:
                             pass
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] Errore: {e}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Errore Zeno: {e}", flush=True)
     finally:
         if response is not None:
             response.close()
@@ -52,9 +72,11 @@ def send_telegram(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
     try:
         response = requests.post(url, json=payload, timeout=10)
-        return response.json()
+        res_json = response.json()
+        print(f"[{time.strftime('%H:%M:%S')}] Telegram {method} response: {res_json}", flush=True)
+        return res_json
     except Exception as e:
-        print(f"Errore richiesta Telegram {method}: {e}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Errore richiesta Telegram {method}: {e}", flush=True)
         return None
 
 def update_radio_bot():
@@ -78,26 +100,31 @@ def update_radio_bot():
                         "text": text
                     }
                     res = send_telegram("editMessageText", edit_payload)
-                    if not res or not res.get("ok"):
-                        PINNED_MESSAGE_ID = None  
+                    # Se il messaggio non esiste più o dà errore strutturale, azzeriamo per crearne uno nuovo
+                    if not res or (not res.get("ok") and "message to edit not found" in str(res.get("description", "")).lower()):
+                        PINNED_MESSAGE_ID = None
+                        save_pinned_id(None)
 
                 if PINNED_MESSAGE_ID is None:
                     send_payload = {
                         "chat_id": CHAT_ID,
-                        "text": text
+                        "text": text,
+                        "disable_notification": True
                     }
                     res = send_telegram("sendMessage", send_payload)
                     if res and res.get("ok"):
                         PINNED_MESSAGE_ID = res["result"]["message_id"]
+                        save_pinned_id(PINNED_MESSAGE_ID)
                         
                         pin_payload = {
                             "chat_id": CHAT_ID,
-                            "message_id": PINNED_MESSAGE_ID
+                            "message_id": PINNED_MESSAGE_ID,
+                            "disable_notification": True
                         }
                         send_telegram("pinChatMessage", pin_payload)
                         
             except Exception as e:
-                print(f"Errore ciclo bot: {e}", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] Errore ciclo bot: {e}", flush=True)
                 
         time.sleep(30)
 
@@ -108,4 +135,4 @@ if __name__ == "__main__":
     t.start()
     
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, threaded=True)
