@@ -1,7 +1,6 @@
 import os
 import time
 import requests
-from telegram import Bot
 from flask import Flask
 
 app = Flask(__name__)
@@ -16,8 +15,6 @@ PINNED_MESSAGE_ID = None
 ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/a1usb5hslvgvv"
 SITE_URL = "https://radioverbania.surge.sh"
 
-bot = Bot(token=TOKEN)
-
 def get_current_song():
     try:
         response = requests.get(ZENO_API_URL, timeout=10)
@@ -31,6 +28,15 @@ def get_current_song():
         print(f"Errore nel recupero della metadata: {e}")
     return "Radio Verbania On Air"
 
+def send_telegram(method, payload):
+    url = f"https://api.telegram.org/bot{TOKEN}/{method}"
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        return response.json()
+    except Exception as e:
+        print(f"Errore richiesta Telegram {method}: {e}")
+        return None
+
 def update_radio_bot():
     global PINNED_MESSAGE_ID
     last_song = ""
@@ -40,27 +46,39 @@ def update_radio_bot():
         if current_song != last_song or PINNED_MESSAGE_ID is None:
             last_song = current_song
             
-            # Testo pulito senza simboli Markdown che possano spezzare il messaggio
-            text = f"RADIO VERBANIA\nIn onda ora: {current_song}\n\nAscolta sul sito: {SITE_URL}"
+            text = f"🔴 RADIO VERBANIA\n🎧 In onda ora: {current_song}\n\n🌐 Ascolta sul sito: {SITE_URL}"
             
             try:
                 if PINNED_MESSAGE_ID is not None:
-                    try:
-                        bot.edit_message_text(
-                            chat_id=CHAT_ID,
-                            message_id=PINNED_MESSAGE_ID,
-                            text=text
-                        )
-                    except Exception:
-                        PINNED_MESSAGE_ID = None
+                    # Modifica il messaggio esistente
+                    edit_payload = {
+                        "chat_id": CHAT_ID,
+                        "message_id": PINNED_MESSAGE_ID,
+                        "text": text
+                    }
+                    res = send_telegram("editMessageText", edit_payload)
+                    if not res or not res.get("ok"):
+                        PINNED_MESSAGE_ID = None  # Se fallisce, lo rimandiamo nuovo
 
                 if PINNED_MESSAGE_ID is None:
-                    sent_msg = bot.send_message(chat_id=CHAT_ID, text=text)
-                    PINNED_MESSAGE_ID = sent_msg.message_id
-                    bot.pin_chat_message(chat_id=CHAT_ID, message_id=PINNED_MESSAGE_ID)
-                    
+                    # Invia nuovo messaggio
+                    send_payload = {
+                        "chat_id": CHAT_ID,
+                        "text": text
+                    }
+                    res = send_telegram("sendMessage", send_payload)
+                    if res and res.get("ok"):
+                        PINNED_MESSAGE_ID = res["result"]["message_id"]
+                        
+                        # Fissa il messaggio nel canale
+                        pin_payload = {
+                            "chat_id": CHAT_ID,
+                            "message_id": PINNED_MESSAGE_ID
+                        }
+                        send_telegram("pinChatMessage", pin_payload)
+                        
             except Exception as e:
-                print(f"Errore Telegram: {e}")
+                print(f"Errore ciclo bot: {e}")
                 
         time.sleep(30)
 
