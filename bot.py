@@ -18,19 +18,33 @@ SITE_URL = "https://radioverbania.surge.sh"
 def get_current_song():
     try:
         response = requests.get(ZENO_API_URL, timeout=10)
+        print(reponse_text := f"Status: {response.status_code}, Contenuto: {response.text}")
+        
         if response.status_code == 200:
-            # Stampa tutto il testo grezzo ricevuto nei log di Render per debug
-            print(f"Risposta grezza Zeno.fm (Testo): {response.text}")
-            
             try:
                 data = response.json()
-                song = data.get("title") or data.get("song") or data.get("streamTitle")
-                if song:
-                    return song
-            except:
-                # Se non è JSON, usa direttamente il testo della risposta pulito
+                # Se la risposta è un dizionario, cerchiamo tutte le chiavi possibili
+                if isinstance(data, dict):
+                    song = (
+                        data.get("title") or 
+                        data.get("song") or 
+                        data.get("streamTitle") or 
+                        data.get("now_playing") or
+                        data.get("ticker")
+                    )
+                    if song:
+                        return str(song).strip()
+                elif isinstance(data, list) and len(data) > 0:
+                    # Se è una lista, prendiamo il primo elemento se ha un titolo
+                    first = data[0]
+                    if isinstance(first, dict):
+                        song = first.get("title") or first.get("song")
+                        if song:
+                            return str(song).strip()
+            except Exception as json_err:
+                print(f"Non è un JSON valido, uso il testo grezzo: {json_err}")
                 text_clean = response.text.strip()
-                if text_clean:
+                if text_clean and "{" not in text_clean:
                     return text_clean
                     
     except Exception as e:
