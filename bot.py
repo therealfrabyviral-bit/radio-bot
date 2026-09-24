@@ -19,18 +19,24 @@ def get_current_song():
     try:
         response = requests.get(ZENO_API_URL, timeout=10)
         if response.status_code == 200:
-            data = response.json()
-            # Stampa la risposta nei log di Render per capire cosa manda Zeno.fm
-            print(f"Risposta grezza Zeno.fm: {data}")
+            # Stampa tutto il testo grezzo ricevuto nei log di Render per debug
+            print(f"Risposta grezza Zeno.fm (Testo): {response.text}")
             
-            # Controlla diverse possibili chiavi nel JSON di Zeno
-            song = data.get("title") or data.get("song") or data.get("now_playing")
-            if not song:
-                song = "In diretta"
-            return song
+            try:
+                data = response.json()
+                song = data.get("title") or data.get("song") or data.get("streamTitle")
+                if song:
+                    return song
+            except:
+                # Se non è JSON, usa direttamente il testo della risposta pulito
+                text_clean = response.text.strip()
+                if text_clean:
+                    return text_clean
+                    
     except Exception as e:
         print(f"Errore nel recupero della metadata: {e}")
-    return "In onda"
+    
+    return "In diretta"
 
 def send_telegram(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
