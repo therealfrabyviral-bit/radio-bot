@@ -28,20 +28,29 @@ def get_current_song():
             try:
                 data = response.json()
                 if isinstance(data, dict):
-                    song = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing")
-                    if song:
-                        return str(song).strip()
+                    # Cerca sia campi combinati che campi separati per artista e titolo
+                    title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing")
+                    artist = data.get("artist") or data.get("author")
+                    
+                    if artist and title:
+                        return f"{artist} - {title}".strip()
+                    elif title:
+                        return str(title).strip()
+                        
                 elif isinstance(data, list) and len(data) > 0:
                     first = data[0]
                     if isinstance(first, dict):
-                        song = first.get("title") or first.get("song")
-                        if song:
-                            return str(song).strip()
+                        title = first.get("title") or first.get("song")
+                        artist = first.get("artist")
+                        if artist and title:
+                            return f"{artist} - {title}".strip()
+                        elif title:
+                            return str(title).strip()
             except Exception as json_err:
                 print(f"Errore parsing JSON: {json_err}")
                 
             text_clean = response.text.strip()
-            if text_clean:
+            if text_clean and not text_clean.startswith("{"):
                 return text_clean
                 
     except Exception as e:
