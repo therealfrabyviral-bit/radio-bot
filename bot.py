@@ -18,17 +18,19 @@ SITE_URL = "https://radioverbania.surge.sh"
 def get_current_song():
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        print("Invio richiesta a Zeno.fm...")
+        print("Invio richiesta a Zeno.fm...", flush=True)
         response = requests.get(ZENO_API_URL, headers=headers, timeout=10)
         
-        print(f"ZENO RESPONSE CODE: {response.status_code}")
-        print(f"ZENO RESPONSE TEXT: {response.text}")
+        print(f"ZENO RESPONSE CODE: {response.status_code}", flush=True)
+        print(f"ZENO RESPONSE TEXT: {response.text}", flush=True)
         
         if response.status_code == 200:
+            text_clean = response.text.strip()
+            
+            # Proviamo a decodificare come JSON se possibile
             try:
                 data = response.json()
                 if isinstance(data, dict):
-                    # 1. Tentativo con le chiavi standard comuni
                     title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing") or data.get("songTitle")
                     artist = data.get("artist") or data.get("author")
                     
@@ -37,16 +39,10 @@ def get_current_song():
                     elif title:
                         return str(title).strip()
                         
-                    # 2. Se le chiavi standard falliscono, cerchiamo tra tutte le chiavi del dizionario
+                    # Cerca qualsiasi chiave utile
                     for k, v in data.items():
                         if any(kw in k.lower() for kw in ["title", "song", "playing", "artist", "name", "text"]) and v:
                             return str(v).strip()
-                            
-                    # 3. Se ancora nulla, prendiamo il primo valore testuale valido dentro il dizionario
-                    for k, v in data.items():
-                        if isinstance(v, str) and v.strip() and len(v.strip()) > 1:
-                            return v.strip()
-                            
                 elif isinstance(data, list) and len(data) > 0:
                     first = data[0]
                     if isinstance(first, dict):
@@ -54,15 +50,14 @@ def get_current_song():
                             if isinstance(v, str) and v.strip():
                                 return v.strip()
             except Exception as json_err:
-                print(f"Errore parsing JSON: {json_err}")
+                print(f"Errore parsing JSON: {json_err}", flush=True)
             
-            # Fallback sul testo grezzo se non è formattato come JSON strutturato
-            text_clean = response.text.strip()
+            # Se non è JSON ma c'è del testo pulito
             if text_clean and not text_clean.startswith("{"):
                 return text_clean
                 
     except Exception as e:
-        print(f"ECCEZIONE CRITICA in get_current_song: {e}")
+        print(f"ECCEZIONE CRITICA in get_current_song: {e}", flush=True)
     
     return "In diretta"
 
@@ -72,14 +67,13 @@ def send_telegram(method, payload):
         response = requests.post(url, json=payload, timeout=10)
         return response.json()
     except Exception as e:
-        print(f"Errore richiesta Telegram {method}: {e}")
+        print(f"Errore richiesta Telegram {method}: {e}", flush=True)
         return None
 
 def update_radio_bot():
     global PINNED_MESSAGE_ID
     last_song = ""
     
-    # Aspettiamo 5 secondi prima di partire per dare tempo a Flask di avviarsi bene
     time.sleep(5)
     
     while True:
@@ -116,7 +110,7 @@ def update_radio_bot():
                         send_telegram("pinChatMessage", pin_payload)
                         
             except Exception as e:
-                print(f"Errore ciclo bot: {e}")
+                print(f"Errore ciclo bot: {e}", flush=True)
                 
         time.sleep(30)
 
