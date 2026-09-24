@@ -17,19 +17,18 @@ ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/subscribe/a1usb5hslvgvv"
 SITE_URL = "https://radioverbania.surge.sh"
 
 def get_current_song():
+    response = None
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Accept': 'text/event-stream'
         }
         response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=5)
-        
+
         if response.status_code == 200:
             for line in response.iter_lines():
                 if line:
                     decoded = line.decode('utf-8', errors='ignore').strip()
-                    
-                    # Ignoriamo le righe di servizio come 'id:' e leggiamo solo i dati reali
                     if decoded.startswith("data:"):
                         json_str = decoded[5:].strip()
                         try:
@@ -37,12 +36,16 @@ def get_current_song():
                             if isinstance(data, dict):
                                 title = data.get("streamTitle") or data.get("title") or data.get("song")
                                 if title:
+                                    print(f"[{time.strftime('%H:%M:%S')}] Titolo ricevuto: {title}", flush=True)
                                     return str(title).strip()
                         except json.JSONDecodeError:
                             pass
     except Exception as e:
-        print(f"Errore: {e}", flush=True)
-    
+        print(f"[{time.strftime('%H:%M:%S')}] Errore: {e}", flush=True)
+    finally:
+        if response is not None:
+            response.close()
+
     return "In diretta"
 
 def send_telegram(method, payload):
