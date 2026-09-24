@@ -17,21 +17,18 @@ SITE_URL = "https://radioverbania.surge.sh"
 
 def get_current_song():
     try:
-        # Aggiungiamo un User-Agent da browser per evitare blocchi da parte di Zeno.fm
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        print("Invio richiesta a Zeno.fm...")
         response = requests.get(ZENO_API_URL, headers=headers, timeout=10)
-        print(f"Status: {response.status_code}, Contenuto: {response.text}")
         
-        if response.status_code == 200 and response.text:
+        print(f"ZENO RESPONSE CODE: {response.status_code}")
+        print(f"ZENO RESPONSE TEXT: {response.text}")
+        
+        if response.status_code == 200:
             try:
                 data = response.json()
                 if isinstance(data, dict):
-                    song = (
-                        data.get("title") or 
-                        data.get("song") or 
-                        data.get("streamTitle") or 
-                        data.get("now_playing")
-                    )
+                    song = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing")
                     if song:
                         return str(song).strip()
                 elif isinstance(data, list) and len(data) > 0:
@@ -40,16 +37,15 @@ def get_current_song():
                         song = first.get("title") or first.get("song")
                         if song:
                             return str(song).strip()
-            except:
-                pass
-            
-            # Se non è un JSON o non ha trovato le chiavi, restituisce il testo grezzo della risposta
+            except Exception as json_err:
+                print(f"Errore parsing JSON: {json_err}")
+                
             text_clean = response.text.strip()
             if text_clean:
                 return text_clean
                 
     except Exception as e:
-        print(f"Errore nel recupero della metadata: {e}")
+        print(f"ECCEZIONE CRITICA in get_current_song: {e}")
     
     return "In diretta"
 
@@ -65,6 +61,9 @@ def send_telegram(method, payload):
 def update_radio_bot():
     global PINNED_MESSAGE_ID
     last_song = ""
+    
+    # Aspettiamo 5 secondi prima di partire per dare tempo a Flask di avviarsi bene
+    time.sleep(5)
     
     while True:
         current_song = get_current_song()
