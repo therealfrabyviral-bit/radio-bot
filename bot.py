@@ -22,29 +22,24 @@ def get_current_song():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Accept': 'text/event-stream'
         }
-        print("Richiesta a Zeno.fm...", flush=True)
         response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=5)
-        print(f"ZENO STATUS: {response.status_code}", flush=True)
         
         if response.status_code == 200:
             for line in response.iter_lines():
                 if line:
-                    decoded = line.decode('utf-8', errors='ignore')
-                    print(f"RIGA RICEVUTA: {decoded}", flush=True)
+                    decoded = line.decode('utf-8', errors='ignore').strip()
                     
+                    # Ignoriamo le righe di servizio come 'id:' e leggiamo solo i dati reali
                     if decoded.startswith("data:"):
-                        decoded = decoded[5:].strip()
-                        
-                    try:
-                        data = json.loads(decoded)
-                        if isinstance(data, dict):
-                            title = data.get("streamTitle") or data.get("title") or data.get("song")
-                            if title:
-                                return str(title).strip()
-                    except:
-                        if decoded and not decoded.startswith("{"):
-                            return decoded
-                    break
+                        json_str = decoded[5:].strip()
+                        try:
+                            data = json.loads(json_str)
+                            if isinstance(data, dict):
+                                title = data.get("streamTitle") or data.get("title") or data.get("song")
+                                if title:
+                                    return str(title).strip()
+                        except json.JSONDecodeError:
+                            pass
     except Exception as e:
         print(f"Errore: {e}", flush=True)
     
