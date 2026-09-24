@@ -38,8 +38,8 @@ def update_radio_bot():
         current_song = get_current_song()
         if current_song and current_song != last_song:
             last_song = current_song
-            # Messaggio che unisce il nome del brano in onda e il link della radio
-            text = f"🎶 **In onda ora su Radio Verbania:**\n{current_song}\n\n🎧 Ascolta qui: {PLAYER_URL}"
+            # Messaggio strutturato con il nome della radio e il brano in tempo reale
+            text = f"🔴 **RADIO VERBANIA**\n🎧 In onda ora: {current_song}\n\n🌐 Visita il sito: {PLAYER_URL}"
             
             try:
                 if PINNED_MESSAGE_ID is None:
