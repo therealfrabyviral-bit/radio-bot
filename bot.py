@@ -20,13 +20,17 @@ def get_current_song():
         response = requests.get(ZENO_API_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            song = data.get("title")
+            # Stampa la risposta nei log di Render per capire cosa manda Zeno.fm
+            print(f"Risposta grezza Zeno.fm: {data}")
+            
+            # Controlla diverse possibili chiavi nel JSON di Zeno
+            song = data.get("title") or data.get("song") or data.get("now_playing")
             if not song:
                 song = "In diretta"
             return song
     except Exception as e:
         print(f"Errore nel recupero della metadata: {e}")
-    return "Radio Verbania On Air"
+    return "In onda"
 
 def send_telegram(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
@@ -50,7 +54,6 @@ def update_radio_bot():
             
             try:
                 if PINNED_MESSAGE_ID is not None:
-                    # Modifica il messaggio esistente
                     edit_payload = {
                         "chat_id": CHAT_ID,
                         "message_id": PINNED_MESSAGE_ID,
@@ -58,10 +61,9 @@ def update_radio_bot():
                     }
                     res = send_telegram("editMessageText", edit_payload)
                     if not res or not res.get("ok"):
-                        PINNED_MESSAGE_ID = None  # Se fallisce, lo rimandiamo nuovo
+                        PINNED_MESSAGE_ID = None  
 
                 if PINNED_MESSAGE_ID is None:
-                    # Invia nuovo messaggio
                     send_payload = {
                         "chat_id": CHAT_ID,
                         "text": text
@@ -70,7 +72,6 @@ def update_radio_bot():
                     if res and res.get("ok"):
                         PINNED_MESSAGE_ID = res["result"]["message_id"]
                         
-                        # Fissa il messaggio nel canale
                         pin_payload = {
                             "chat_id": CHAT_ID,
                             "message_id": PINNED_MESSAGE_ID
