@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import requests
 from flask import Flask
 
@@ -12,50 +13,55 @@ def home():
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = "-1004486063729"
 PINNED_MESSAGE_ID = None  
-ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/a1usb5hslvgvv"
+# URL corretto con /subscribe/ per le API pubbliche di Zeno.fm
+ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/subscribe/a1usb5hslvgvv"
 SITE_URL = "https://radioverbania.surge.sh"
 
 def get_current_song():
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        print("Invio richiesta a Zeno.fm...", flush=True)
-        response = requests.get(ZENO_API_URL, headers=headers, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Accept': 'text/event-stream'
+        }
+        print("Invio richiesta a Zeno.fm (subscribe)...", flush=True)
         
+        # Usiamo stream=True per leggere lo stream di eventi SSE di Zeno
+        response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=8)
         print(f"ZENO RESPONSE CODE: {response.status_code}", flush=True)
-        print(f"ZENO RESPONSE TEXT: {response.text}", flush=True)
         
         if response.status_code == 200:
-            text_clean = response.text.strip()
-            
-            # Proviamo a decodificare come JSON se possibile
-            try:
-                data = response.json()
-                if isinstance(data, dict):
-                    title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing") or data.get("songTitle")
-                    artist = data.get("artist") or data.get("author")
+            for line in response.iter_lines():
+                if line:
+                    decoded = line.decode('utf-8', errors='ignore')
+                    print(f"ZENO LINE: {decoded}", flush=True)
                     
-                    if artist and title:
-                        return f"{artist} - {title}".strip()
-                    elif title:
-                        return str(title).strip()
+                    # Rimuoviamo il prefisso "data:" tipico degli SSE se presente
+                    if decoded.startswith("data:"):
+                        decoded = decoded[5:].strip()
                         
-                    # Cerca qualsiasi chiave utile
-                    for k, v in data.items():
-                        if any(kw in k.lower() for kw in ["title", "song", "playing", "artist", "name", "text"]) and v:
-                            return str(v).strip()
-                elif isinstance(data, list) and len(data) > 0:
-                    first = data[0]
-                    if isinstance(first, dict):
-                        for k, v in first.items():
-                            if isinstance(v, str) and v.strip():
-                                return v.strip()
-            except Exception as json_err:
-                print(f"Errore parsing JSON: {json_err}", flush=True)
-            
-            # Se non è JSON ma c'è del testo pulito
-            if text_clean and not text_clean.startswith("{"):
-                return text_clean
-                
+                    try:
+                        data = json.loads(decoded)
+                        if isinstance(data, dict):
+                            title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing") or data.get("songTitle")
+                            artist = data.get("artist") or data.get("author")
+                            
+                            if artist and title:
+                                return f"{artist} - {title}".strip()
+                            elif title:
+                                return str(title).strip()
+                                
+                            # Cerca tra tutte le chiavi se non trova i campi standard
+                            for k, v in data.items():
+                                if any(kw in k.lower() for kw in ["title", "song", "playing", "artist", "name", "text"]) and v:
+                                    return str(v).strip()
+                    except json.JSONDecodeError:
+                        # Se non è un JSON puro ma del testo valido
+                        if decoded and not decoded.startswith("{") and len(decoded) > 1:
+                            return decoded
+                            
+                    # Usciamo dal ciclo dopo aver letto il primo pacchetto utile per evitare blocchi
+                    break
+                    
     except Exception as e:
         print(f"ECCEZIONE CRITICA in get_current_song: {e}", flush=True)
     
