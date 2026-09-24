@@ -28,8 +28,8 @@ def get_current_song():
             try:
                 data = response.json()
                 if isinstance(data, dict):
-                    # Cerca sia campi combinati che campi separati per artista e titolo
-                    title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing")
+                    # 1. Tentativo con le chiavi standard comuni
+                    title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing") or data.get("songTitle")
                     artist = data.get("artist") or data.get("author")
                     
                     if artist and title:
@@ -37,18 +37,26 @@ def get_current_song():
                     elif title:
                         return str(title).strip()
                         
+                    # 2. Se le chiavi standard falliscono, cerchiamo tra tutte le chiavi del dizionario
+                    for k, v in data.items():
+                        if any(kw in k.lower() for kw in ["title", "song", "playing", "artist", "name", "text"]) and v:
+                            return str(v).strip()
+                            
+                    # 3. Se ancora nulla, prendiamo il primo valore testuale valido dentro il dizionario
+                    for k, v in data.items():
+                        if isinstance(v, str) and v.strip() and len(v.strip()) > 1:
+                            return v.strip()
+                            
                 elif isinstance(data, list) and len(data) > 0:
                     first = data[0]
                     if isinstance(first, dict):
-                        title = first.get("title") or first.get("song")
-                        artist = first.get("artist")
-                        if artist and title:
-                            return f"{artist} - {title}".strip()
-                        elif title:
-                            return str(title).strip()
+                        for k, v in first.items():
+                            if isinstance(v, str) and v.strip():
+                                return v.strip()
             except Exception as json_err:
                 print(f"Errore parsing JSON: {json_err}")
-                
+            
+            # Fallback sul testo grezzo se non è formattato come JSON strutturato
             text_clean = response.text.strip()
             if text_clean and not text_clean.startswith("{"):
                 return text_clean
