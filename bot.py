@@ -17,17 +17,41 @@ SITE_URL = "https://radioverbania.surge.sh"
 
 def get_current_song():
     try:
-        response = requests.get(ZENO_API_URL, timeout=10)
+        # Aggiungiamo un User-Agent da browser per evitare blocchi da parte di Zeno.fm
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(ZENO_API_URL, headers=headers, timeout=10)
         print(f"Status: {response.status_code}, Contenuto: {response.text}")
         
         if response.status_code == 200 and response.text:
-            # Restituiamo direttamente il testo grezzo della risposta per vederlo su Telegram
-            return response.text.strip()
+            try:
+                data = response.json()
+                if isinstance(data, dict):
+                    song = (
+                        data.get("title") or 
+                        data.get("song") or 
+                        data.get("streamTitle") or 
+                        data.get("now_playing")
+                    )
+                    if song:
+                        return str(song).strip()
+                elif isinstance(data, list) and len(data) > 0:
+                    first = data[0]
+                    if isinstance(first, dict):
+                        song = first.get("title") or first.get("song")
+                        if song:
+                            return str(song).strip()
+            except:
+                pass
             
+            # Se non è un JSON o non ha trovato le chiavi, restituisce il testo grezzo della risposta
+            text_clean = response.text.strip()
+            if text_clean:
+                return text_clean
+                
     except Exception as e:
         print(f"Errore nel recupero della metadata: {e}")
     
-    return "Nessun dato"
+    return "In diretta"
 
 def send_telegram(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
