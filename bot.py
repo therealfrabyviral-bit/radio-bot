@@ -13,7 +13,6 @@ def home():
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = "-1004486063729"
 PINNED_MESSAGE_ID = None  
-# URL corretto con /subscribe/ per le API pubbliche di Zeno.fm
 ZENO_API_URL = "https://api.zeno.fm/mounts/metadata/subscribe/a1usb5hslvgvv"
 SITE_URL = "https://radioverbania.surge.sh"
 
@@ -23,47 +22,31 @@ def get_current_song():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Accept': 'text/event-stream'
         }
-        print("Invio richiesta a Zeno.fm (subscribe)...", flush=True)
-        
-        # Usiamo stream=True per leggere lo stream di eventi SSE di Zeno
-        response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=8)
-        print(f"ZENO RESPONSE CODE: {response.status_code}", flush=True)
+        print("Richiesta a Zeno.fm...", flush=True)
+        response = requests.get(ZENO_API_URL, headers=headers, stream=True, timeout=5)
+        print(f"ZENO STATUS: {response.status_code}", flush=True)
         
         if response.status_code == 200:
             for line in response.iter_lines():
                 if line:
                     decoded = line.decode('utf-8', errors='ignore')
-                    print(f"ZENO LINE: {decoded}", flush=True)
+                    print(f"RIGA RICEVUTA: {decoded}", flush=True)
                     
-                    # Rimuoviamo il prefisso "data:" tipico degli SSE se presente
                     if decoded.startswith("data:"):
                         decoded = decoded[5:].strip()
                         
                     try:
                         data = json.loads(decoded)
                         if isinstance(data, dict):
-                            title = data.get("title") or data.get("song") or data.get("streamTitle") or data.get("now_playing") or data.get("songTitle")
-                            artist = data.get("artist") or data.get("author")
-                            
-                            if artist and title:
-                                return f"{artist} - {title}".strip()
-                            elif title:
+                            title = data.get("streamTitle") or data.get("title") or data.get("song")
+                            if title:
                                 return str(title).strip()
-                                
-                            # Cerca tra tutte le chiavi se non trova i campi standard
-                            for k, v in data.items():
-                                if any(kw in k.lower() for kw in ["title", "song", "playing", "artist", "name", "text"]) and v:
-                                    return str(v).strip()
-                    except json.JSONDecodeError:
-                        # Se non è un JSON puro ma del testo valido
-                        if decoded and not decoded.startswith("{") and len(decoded) > 1:
+                    except:
+                        if decoded and not decoded.startswith("{"):
                             return decoded
-                            
-                    # Usciamo dal ciclo dopo aver letto il primo pacchetto utile per evitare blocchi
                     break
-                    
     except Exception as e:
-        print(f"ECCEZIONE CRITICA in get_current_song: {e}", flush=True)
+        print(f"Errore: {e}", flush=True)
     
     return "In diretta"
 
