@@ -4,7 +4,6 @@ import requests
 from telegram import Bot
 from flask import Flask
 
-# Configurazione del server web per Render
 app = Flask(__name__)
 
 @app.route('/')
@@ -24,10 +23,9 @@ def get_current_song():
         response = requests.get(ZENO_API_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # Spesso Zeno.fm restituisce il brano sotto 'title' o 'artist'/'song'
             song = data.get("title")
             if not song:
-                song = "In diretta / In onda"
+                song = "In diretta"
             return song
     except Exception as e:
         print(f"Errore nel recupero della metadata: {e}")
@@ -39,28 +37,25 @@ def update_radio_bot():
     
     while True:
         current_song = get_current_song()
-        # Perforza l'invio almeno al primo avvio o se cambia la canzone
         if current_song != last_song or PINNED_MESSAGE_ID is None:
             last_song = current_song
             
-            text = f"🔴 **RADIO VERBANIA**\n🎧 In onda ora: {current_song}\n\n🌐 Visita il sito: {SITE_URL}"
+            # Testo pulito senza simboli Markdown che possano spezzare il messaggio
+            text = f"RADIO VERBANIA\nIn onda ora: {current_song}\n\nAscolta sul sito: {SITE_URL}"
             
             try:
-                # Se c'è già un messaggio pinnato, proviamo a modificarlo
                 if PINNED_MESSAGE_ID is not None:
                     try:
                         bot.edit_message_text(
                             chat_id=CHAT_ID,
                             message_id=PINNED_MESSAGE_ID,
-                            text=text,
-                            parse_mode="Markdown"
+                            text=text
                         )
                     except Exception:
-                        # Se il messaggio è stato cancellato a mano, lo rimandiamo
                         PINNED_MESSAGE_ID = None
 
                 if PINNED_MESSAGE_ID is None:
-                    sent_msg = bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="Markdown")
+                    sent_msg = bot.send_message(chat_id=CHAT_ID, text=text)
                     PINNED_MESSAGE_ID = sent_msg.message_id
                     bot.pin_chat_message(chat_id=CHAT_ID, message_id=PINNED_MESSAGE_ID)
                     
